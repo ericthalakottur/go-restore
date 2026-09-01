@@ -3,7 +3,10 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
+
+	"go-restore/pm"
 
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
@@ -29,6 +32,7 @@ type model struct {
 	TabContent         []string
 	activeTab          int
 	searchPackageInput textinput.Model
+	PackageManager     pm.PackageManger
 }
 
 func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
@@ -154,24 +158,26 @@ func (m model) View() tea.View {
 
 func (m model) viewPage() string {
 	columns := []table.Column{
-		{Title: "No.", Width: 10},
-		{Title: "Package Name", Width: 40},
+		{Title: "No.", Width: 5},
+		{Title: "Package Name", Width: 20},
+		{Title: "Version", Width: 20},
 	}
 	totalColumnWidth := 5
 	for _, column := range columns {
 		totalColumnWidth += column.Width
 	}
-	rows := []table.Row{
-		{"1.", "Test"},
-		{"2.", "Test"},
-		{"3.", "Test"},
-		{"4.", "Test"},
+
+	rows := []table.Row{}
+	packages, _ := m.PackageManager.ListPackages()
+	for i := 0; i < len(packages); i++ {
+		rows = append(rows, table.Row{strconv.Itoa((i + 1)), packages[i].Name, packages[i].Version})
 	}
+
 	packageListTable := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(false),
-		table.WithHeight(10),
+		table.WithHeight(len(packages)),
 		table.WithWidth(totalColumnWidth),
 	)
 
@@ -180,7 +186,7 @@ func (m model) viewPage() string {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		BorderBottom(false).
-		Bold(false)
+		Align(lipgloss.Left)
 	style.Selected = lipgloss.NewStyle()
 	packageListTable.SetStyles(style)
 
@@ -210,8 +216,15 @@ func createModel() model {
 	tabs := []string{"view", "search"}
 
 	m := model{Tabs: tabs, styles: newStyles()}
-	m.TabContent = m.getTabContent()
 
+	packageManager, err := pm.GetPackageManager()
+	if err != nil {
+		log.Fatal("Unable to get the installed package manager")
+		os.Exit(1)
+	}
+	m.PackageManager = packageManager
+
+	m.TabContent = m.getTabContent()
 	return m
 }
 
